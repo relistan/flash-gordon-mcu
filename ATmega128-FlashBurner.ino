@@ -42,7 +42,9 @@ void setup() {
   Serial.println("--------------------------------");
   Serial.printf("Starting control pins: 0x%02X\n", startingConfig);
   
-  chipErase();
+  //chipErase();
+
+  //sectorErase(0);
 
 /*
   for(int i = 0; i < 50; i++) {
@@ -93,6 +95,19 @@ void chipErase() {
   sendByte(0x5555, 0x10);
 
   delay(100);
+}
+
+// sectorErase supports up to a 12-bit number. It erases a single sector in the Flash.
+// The chip has 4KB sectors. Sector erase takes about 18ms.
+void sectorErase(uint16_t sector) {
+  sendByte(0x5555, 0xaa);
+  sendByte(0x2aaa, 0x55);
+  sendByte(0x5555, 0x80);
+  
+  sendByte(0x5555, 0xaa);
+  sendByte(0x2aaa, 0x55);
+  sendByte(0x5555, 0x10);
+  delay(19);
 }
 
 void sendByte(uint32_t address, byte data) {
