@@ -125,9 +125,14 @@ int main(int argc, char **argv) {
 
 	uint16_t baseAddr = 0;
 
+	uint8_t receivedEOF = 0;
+
 	while(1) {
 		line = fgets(buf, BUFFER_SIZE, fp);
 		if(line == NULL) {
+			if(!receivedEOF) {
+				fprintf(stderr, "Got end of file without EOF record. Suspect corrupt data.\n");
+			}
 			break;
 		}
 
@@ -147,6 +152,9 @@ int main(int argc, char **argv) {
 		hexDump(&result);
 
 		switch(result.recType) {
+		case REC_TYPE_EOF:
+			receivedEOF = 1;
+			break;
 		case REC_TYPE_EXTSEG:
 			baseAddr = (uint16_t)result.output[0];
 			if(DEBUG) {
