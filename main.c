@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// Docs on the format: http://www.keil.com/support/docs/1584/
+
 /*
 :10001300AC12AD13AE10AF1112002F8E0E8F0F2244
 :10000300E50B250DF509E50A350CF5081200132259
@@ -12,6 +14,13 @@
 */
 
 #define BUFFER_SIZE 100
+
+#define DEBUG 0
+
+#define REC_TYPE_DATA 0
+#define REC_TYPE_EOF 1     // end-of-file record
+#define REC_TYPE_EXTSEG 2  // extended segment address record
+#define REC_TYPE_EXTADDR 4 // extended linear address record (for 32bit records)
 
 const char* const errCodes[] = {
 	"Encountered NULL before end of line",
@@ -37,7 +46,8 @@ typedef struct {
 // decodeLine decodes a line of Intel Hex file and populates the resulting
 // data into the `result` struct that is passed in. The `output` field
 // must already have been allocated before it is passed as a member of the
-// struct.
+// struct. If a non-zero value is returned, none of the values in the output
+// struct can be relied upon.
 int decodeLine(char *line, DecodeResult *result) {
 	if(line[0] != ':') {
 		puts("ERROR, unrecognized starting character");
@@ -79,9 +89,26 @@ int decodeLine(char *line, DecodeResult *result) {
 }
 
 // hexDump prints out a set of bytes as hex values, separated by spaces.
-void hexDump(uint8_t *input, uint8_t len) {
-	for(uint8_t i = 0; i < len; i++) {
-		printf("%02X ", input[i]);
+void hexDump(DecodeResult *result) {
+	switch(result->recType) {
+	case REC_TYPE_DATA:
+		printf("D ");
+		break;
+	case REC_TYPE_EOF:
+		printf("E ");
+		break;
+	case REC_TYPE_EXTADDR:
+		printf("A ");
+		break;
+	case REC_TYPE_EXTSEG:
+		printf("S ");
+		break;
+	default:
+		printf("ERROR");
+	}
+
+	for(uint8_t i = 0; i < result->len; i++) {
+		printf("%02X ", result->output[i]);
 	}
 	puts("");
 }
@@ -96,23 +123,36 @@ int main(int argc, char **argv) {
 	DecodeResult result;
 	result.output = output;
 
+	uint16_t baseAddr = 0;
+
 	while(1) {
 		line = fgets(buf, BUFFER_SIZE, fp);
 		if(line == NULL) {
 			break;
 		}
 
-		int len = decodeLine(line, &result);
-		if(len < 0) {
-			fprintf(stderr, "Error decoding: %s\n", errCodes[0 - len - 1]);
+		int code = decodeLine(line, &result);
+		if(code < 0) {
+			fprintf(stderr, "Error decoding: %s\n", errCodes[0 - code - 1]);
 			continue;
 		}
 
-		printf("Len: %d\n", result.len);
-		printf("Addr: %d\n", result.addr);
-		printf("RecType: %d\n", result.recType);
+		if(DEBUG) {
+			puts(line);
+			printf("Len: %d\n", result.len);
+			printf("Addr: %d\n", result.addr);
+			printf("RecType: %d\n", result.recType);
+		}
 
-		hexDump(result.output, result.len);
-		puts(line);
+		hexDump(&result);
+
+		switch(result.recType) {
+		case REC_TYPE_EXTSEG:
+			baseAddr = (uint16_t)result.output[0];
+			if(DEBUG) {
+				printf("new base addr: 0x%X\n", baseAddr);
+			}
+			break;
+		}
 	}
 }
