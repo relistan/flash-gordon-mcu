@@ -34,8 +34,8 @@ uint8_t hexToByte(char *input) {
 	return (partA << 4) + partB;
 }
 
-// A DecodeResult contains all the values decoded from a single line of
-// the hex file.
+// A DecodeResult contains all the values decoded from a single line of the hex
+// file.
 typedef struct {
 	uint8_t len;
 	uint8_t  *output;
@@ -43,11 +43,11 @@ typedef struct {
 	uint8_t  recType;
 } DecodeResult;
 
-// decodeLine decodes a line of Intel Hex file and populates the resulting
-// data into the `result` struct that is passed in. The `output` field
-// must already have been allocated before it is passed as a member of the
-// struct. If a non-zero value is returned, none of the values in the output
-// struct can be relied upon.
+// decodeLine decodes a line of Intel Hex file and populates the resulting data
+// into the `result` struct that is passed in. The `output` field must already
+// have been allocated before it is passed as a member of the struct. If a
+// non-zero value is returned, none of the values in the output struct can be
+// relied upon.
 int decodeLine(char *line, DecodeResult *result) {
 	if(line[0] != ':') {
 		puts("ERROR, unrecognized starting character");
@@ -80,6 +80,8 @@ int decodeLine(char *line, DecodeResult *result) {
 
 	result->len = result->len >> 1; // divide back to actual length
 
+	// Make sure the checksum is legit or return an error. In that case
+	// it was most likely corrupted in the serial upload.
 	uint8_t calculated = (checkTotal ^ 0xFF) + 1;
 	if(calculated != checkSum) {
 		return -2; // mismatched checksum
@@ -113,7 +115,15 @@ void hexDump(DecodeResult *result) {
 	puts("");
 }
 
+// writeRecord writes a record to the flash chip with the specified base
+// address.
+void writeRecord(uint16_t baseAddr, DecodeResult *result) {
+
+}
+
 int main(int argc, char **argv) {
+	puts("Starting up.\n");
+
 	FILE *fp = fopen(argv[1], "r");
 
 	char buf[BUFFER_SIZE];	
@@ -161,6 +171,13 @@ int main(int argc, char **argv) {
 				printf("new base addr: 0x%X\n", baseAddr);
 			}
 			break;
+		case REC_TYPE_DATA:
+			writeRecord(baseAddr, &result);
+			break;
+		default:
+			fprintf(stderr, "Unknown record type: %0d", result.recType);
 		}
 	}
+
+	puts("\nComplete.");
 }
