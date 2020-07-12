@@ -4,6 +4,7 @@
 // Docs on the format: http://www.keil.com/support/docs/1584/
 
 /*
+Example:
 :10001300AC12AD13AE10AF1112002F8E0E8F0F2244
 :10000300E50B250DF509E50A350CF5081200132259
 :03000000020023D8
@@ -13,6 +14,8 @@
 :00000001FF
 */
 
+// BUFFER_SIZE defines how big the buffer is that we'll use for each line.
+// This will end up 
 #define BUFFER_SIZE 100
 
 #define DEBUG 0
@@ -31,7 +34,7 @@ const char* const errCodes[] = {
 uint8_t hexToByte(char *input) {
 	char partA = input[0] > 57 ? input[0] - 55 : input[0] - 48;
 	char partB = input[1] > 57 ? input[1] - 55 : input[1] - 48;
-	return (partA << 4) + partB;
+	return (partA << 4) | partB;
 }
 
 // A DecodeResult contains all the values decoded from a single line of the hex
@@ -166,12 +169,14 @@ int main(int argc, char **argv) {
 			receivedEOF = 1;
 			break;
 		case REC_TYPE_EXTSEG:
-			baseAddr = (uint16_t)result.output[0];
+ 			// Shift over 4 bits because this represents the high bits of the address
+			baseAddr = ((uint16_t)result.output[0]) << 4;
 			if(DEBUG) {
 				printf("new base addr: 0x%X\n", baseAddr);
 			}
 			break;
 		case REC_TYPE_DATA:
+			// Do the work: write to the flash
 			writeRecord(baseAddr, &result);
 			break;
 		default:
