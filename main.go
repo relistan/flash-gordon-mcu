@@ -55,10 +55,11 @@ func main() {
 		allBytes := []byte{byte(readLen), 0x0, 0x0}
 
 		binary.BigEndian.PutUint16(allBytes[1:], uint16(addr))
+		allBytes = append(allBytes, 0x0) // 0x0 is data record type
 		allBytes = append(allBytes, bufBytes...)
 		checkSum := checksumFor(allBytes, []byte{})
 
-		fmt.Printf(":%02X%02X%02X%02X%02X%02X\r\n", allBytes[0], allBytes[1], allBytes[2], 0x0, allBytes[3:], checkSum)
+		fmt.Printf(":%02X%02X\r\n", allBytes, checkSum)
 
 		addr += readLen
 
