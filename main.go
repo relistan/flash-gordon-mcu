@@ -10,6 +10,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	BytesPerLine = 32
+)
+
+var (
+	twoToThe16th = int(math.Pow(2, 16))
+)
+
 func checksumFor(record []byte, buf []byte) byte {
 	var sum uint16
 	for _, j := range record {
@@ -26,6 +34,18 @@ func checksumFor(record []byte, buf []byte) byte {
 	return result
 }
 
+func formatRecord(recLen int, addr int, recType byte, rec []byte) string {
+	// Get first byte of recLen (it's BytesPerLine or less) and pad with space for
+	// the 16bit addr as well. We'll overwrite those 0x0s with addr. Follow
+	// with the rest of the record
+	allBytes := append([]byte{byte(recLen), 0x0, 0x0, recType}, rec...)
+
+	binary.BigEndian.PutUint16(allBytes[1:], uint16(addr))
+	checkSum := checksumFor(allBytes, []byte{})
+
+	return fmt.Sprintf(":%02X%02X", allBytes, checkSum)
+}
+
 func main() {
 	filename := os.Args[1]
 
@@ -34,11 +54,14 @@ func main() {
 		log.Fatalf("Unable to open %s: %s", filename, err)
 	}
 
-	buf := make([]byte, 32)
+	buf := make([]byte, BytesPerLine)
 	addr := 0
 	segment := 0
 
 	var shouldStop bool
+
+	// Starting address record
+	fmt.Println(formatRecord(2, 0x0, 0x04, []byte{0x0, 0x0}))
 
 	for !shouldStop {
 		readLen, err := io.ReadFull(file, buf)
@@ -49,30 +72,20 @@ func main() {
 			log.Fatalf("Error on read: %s", err)
 		}
 
-		bufBytes := buf[:readLen]
-		// Get first byte of readLen (it's 32 or less) and pad with space for
-		// the 16bit addr as well. We'll overwrite those 0x0s with addr.
-		allBytes := []byte{byte(readLen), 0x0, 0x0}
-
-		binary.BigEndian.PutUint16(allBytes[1:], uint16(addr))
-		allBytes = append(allBytes, 0x0) // 0x0 is data record type
-		allBytes = append(allBytes, bufBytes...)
-		checkSum := checksumFor(allBytes, []byte{})
-
-		fmt.Printf(":%02X%02X\r\n", allBytes, checkSum)
-
+		fmt.Println(formatRecord(readLen, addr, 0x0, buf[:readLen]))
 		addr += readLen
 
 		// Handle more than 16 bits by emitting a new segment record
-		if addr > int(math.Pow(2, 16) - 1) {
+		if addr > twoToThe16th - 1 {
 			log.Errorf("%d", addr)
-			addr -= int(math.Pow(2, 16) - 1)
+			addr -= twoToThe16th - 1
 			segment++
 
-			recordBytes := []byte{0x02, 0x00, 0x00, 0x02}
-			fmt.Printf(":02000002%04X%02X\r\n", segment, checksumFor(recordBytes, buf[:readLen]))
+			segmentBytes := make([]byte, 2)
+			binary.BigEndian.PutUint16(segmentBytes, uint16(segment))
+			fmt.Println(formatRecord(0x02, 0x00, 0x02, segmentBytes))
 		}
 	}
 
-	fmt.Printf(":00000001FF\r\n")
+	fmt.Printf(":00000001FF\n")
 }
