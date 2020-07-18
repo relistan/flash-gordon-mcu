@@ -79,7 +79,6 @@ func main() {
 		// Handle more than 16 bits by emitting a new segment record when
 		// we have an address bigger than 16bits.
 		if addr > twoToThe16th-1 {
-			log.Errorf("%d", addr)
 			addr -= twoToThe16th - 1
 			segment++
 
