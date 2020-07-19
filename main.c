@@ -84,7 +84,7 @@ int decodeLine(char *line, DecodeResult *result) {
 	for(uint8_t i = 9; i < 9 + result->len; i += 2, outCount++) {
 		// End at the null terminator just in case we hit it before
 		// the correct line length in an badly-encoded file.
-		if(line+i == '\0') {
+		if(line[i] == '\0') {
 			return -1; // null before end of line
 		}
 
@@ -154,8 +154,8 @@ void writeRecord(uint16_t baseAddr, DecodeResult *result) {
 int main(int argc, char **argv) {
 	puts("Starting up.\n");
 
-	//FILE *fp = fopen("/dev/stdin", "r");//argv[1], "r");
-	FILE *fp = fopen(argv[1], "r");
+	FILE *fp = fopen("/dev/stdin", "r");
+	//FILE *fp = fopen(argv[1], "r");
 
 	char buf[BUFFER_SIZE];	
 	uint8_t output[BUFFER_SIZE];
@@ -179,7 +179,7 @@ int main(int argc, char **argv) {
 		int code = decodeLine(line, &result);
 		if(code < 0) {
 			fprintf(stderr, "Error decoding: %s\n", errCodes[0 - code - 1]);
-			continue;
+			break;
 		}
 
 		hexDump(&result);
