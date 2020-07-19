@@ -55,39 +55,41 @@ func formatRecord(addr int, recType byte, rec []byte) string {
 func parseConfig() *Config {
 	config := &Config{
 		InputFile: kingpin.Arg("input-file", "The file to take input from").String(),
-		BaseAddr: kingpin.Arg("base-addr", "Base Address to use as starting address").Default("0").Int(),
+		BaseAddr:  kingpin.Arg("base-addr", "Base Address to use as starting address").Default("0").Int(),
 	}
 	kingpin.Parse()
 	return config
+}
+
+// configureFile returns either stdin or the open file named in the config
+func configureFile(config *Config) *os.File {
+	// If we got a filename use it. Otherwise use stdin.
+	if *config.InputFile == "" {
+		return os.Stdin
+	}
+
+	file, err := os.Open(*config.InputFile)
+	if err != nil {
+		log.Fatalf("Unable to open %s: %s", *config.InputFile, err)
+	}
+
+	return file
 }
 
 func main() {
 	config := parseConfig()
 
 	var (
-		file *os.File
-		err error
-	)
-
-	// If we got a filename use it. Otherwise use stdin.
-	if *config.InputFile == "" {
-		file = os.Stdin
-	} else {
-		file, err = os.Open(*config.InputFile)
-		if err != nil {
-			log.Fatalf("Unable to open %s: %s", *config.InputFile, err)
-		}
-	}
-
-	var (
 		addr       int = *config.BaseAddr
-		segment    int
+		segment    int = addr % twoToThe16th
 		shouldStop bool
 		buf        []byte = make([]byte, BytesPerLine)
 	)
 
 	// Starting address record
 	fmt.Println(formatRecord(0x0, 0x04, []byte{0x0, 0x0}))
+
+	file := configureFile(config)
 
 	for !shouldStop {
 		readLen, err := io.ReadFull(file, buf)
