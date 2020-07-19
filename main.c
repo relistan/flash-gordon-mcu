@@ -47,6 +47,22 @@ typedef struct {
 	uint8_t  recType;
 } DecodeResult;
 
+// checksumFor calculates the checksum for an array of bytes
+uint8_t checksumFor(char *line, uint8_t len) {
+    uint8_t sum
+
+    // Start from 1, to skip ':', run to full len
+	for(uint8_t i = 1; i <= len; i++) {
+        // Exit early if we hit the end of string or EOL
+		if(line[i] == '\0' || line[i] == '\n') {
+            break;
+		}
+        sum += line[i];
+	}
+
+    return (sum ^ 0xFF) + 1;
+}
+
 // decodeLine decodes a line of Intel Hex file and populates the resulting data
 // into the `result` struct that is passed in. The `output` field must already
 // have been allocated before it is passed as a member of the struct. If a
@@ -61,7 +77,7 @@ int decodeLine(char *line, DecodeResult *result) {
 	result->addr = (hexToByte(&line[3]) << 8) | hexToByte(&line[5]);
 	result->recType = hexToByte(&line[7]);
 
-	uint16_t checkTotal = result->len + result->addr + result->recType;
+	uint8_t checkTotal = result->len + result->addr + result->recType;
 
 	result->len = result->len << 1; // Double the length because it's hex encoded
 
