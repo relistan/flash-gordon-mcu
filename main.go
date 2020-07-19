@@ -23,21 +23,19 @@ var (
 
 // checksumFor calculates the checksum byte for the byteslice we pass in
 func checksumFor(record []byte) byte {
-	var sum uint16
+	var sum byte
 	for _, j := range record {
-		sum += uint16(j)
+		sum += byte(j)
 	}
 
-	sum = (sum ^ 0xFF) + 1
-
-	result := byte(sum) // truncate to 8 bits
-	return result
+	return (sum ^ 0xFF) + 1
 }
 
+// formatRecord prints out a record in the correctly encoded format.
 func formatRecord(addr int, recType byte, rec []byte) string {
 	// Get first byte of rec len (it's BytesPerLine or less) and pad with space for
 	// the 16bit addr as well. We'll overwrite those 0x0s with addr. Follow
-	// with the rest of the record
+	// with the rest of the record.
 	allBytes := append([]byte{byte(len(rec)), 0x0, 0x0, recType}, rec...)
 
 	binary.BigEndian.PutUint16(allBytes[1:], uint16(addr))
