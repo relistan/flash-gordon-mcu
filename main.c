@@ -18,7 +18,7 @@ Example:
 // This will end up 
 #define BUFFER_SIZE 100
 
-#define DEBUG 0
+#define DEBUG 1
 
 #define REC_TYPE_DATA 0
 #define REC_TYPE_EOF 1     // end-of-file record
@@ -27,7 +27,8 @@ Example:
 
 const char* const errCodes[] = {
 	"Encountered NULL before end of line",
-	"Mismatched checksum"
+	"Mismatched checksum",
+	"Unrecognized starting character"
 };
 
 // hexToByte converts a single hex pair into a byte of data.
@@ -53,28 +54,28 @@ typedef struct {
 // relied upon.
 int decodeLine(char *line, DecodeResult *result) {
 	if(line[0] != ':') {
-		puts("ERROR, unrecognized starting character");
+		return -3;
 	}
 
-	result->len = hexToByte(line+1);
-	result->addr = (hexToByte(line+3) << 8) + hexToByte(line+5);
-	result->recType = hexToByte(line+7);
+	result->len = hexToByte(&line[1]);
+	result->addr = (hexToByte(&line[3]) << 8) | hexToByte(&line[5]);
+	result->recType = hexToByte(&line[7]);
 
-	uint8_t checkTotal = result->len + result->addr + result->recType;
+	uint16_t checkTotal = result->len + result->addr + result->recType;
 
 	result->len = result->len << 1; // Double the length because it's hex encoded
 
-	// Loop through all the remaining data and decode the bytes
+	// Loop through all the remaining data and decode the bytes (start from byte 9).
 	uint8_t outCount = 0;
 	for(uint8_t i = 9; i < 9 + result->len; i += 2, outCount++) {
 		// End at the null terminator just in case we hit it before
-		// in an badly-encoded file.
+		// the correct line length in an badly-encoded file.
 		if(line+i == '\0') {
 			return -1; // null before end of line
 		}
 
-		result->output[outCount] = hexToByte(line+i);
-		checkTotal += result->output[outCount];
+		result->output[outCount] = hexToByte(&line[i]);
+		checkTotal += (uint8_t)result->output[outCount];
 	}
 	result->output[outCount+1] = '\0';
 
@@ -83,10 +84,23 @@ int decodeLine(char *line, DecodeResult *result) {
 
 	result->len = result->len >> 1; // divide back to actual length
 
+	if(DEBUG) {
+		puts(line);
+		printf("Len: %d\n", result->len);
+		printf("Addr: %d\n", result->addr);
+		printf("RecType: %d\n", result->recType);
+		printf("Checksum: %0X\n", checkSum);
+	}
+
 	// Make sure the checksum is legit or return an error. In that case
 	// it was most likely corrupted in the serial upload.
-	uint8_t calculated = (checkTotal ^ 0xFF) + 1;
-	if(calculated != checkSum) {
+	uint16_t calculated = (checkTotal ^ 0xFF) + 1;
+	if((uint8_t)calculated != checkSum) {
+		if(DEBUG) {
+			fprintf(stderr, "Calculated: 0x%0X, Got: 0x%0X\n",
+				(uint8_t)calculated, checkSum
+			);
+		}
 		return -2; // mismatched checksum
 	}
 
@@ -127,6 +141,7 @@ void writeRecord(uint16_t baseAddr, DecodeResult *result) {
 int main(int argc, char **argv) {
 	puts("Starting up.\n");
 
+	//FILE *fp = fopen("/dev/stdin", "r");//argv[1], "r");
 	FILE *fp = fopen(argv[1], "r");
 
 	char buf[BUFFER_SIZE];	
@@ -137,14 +152,13 @@ int main(int argc, char **argv) {
 	result.output = output;
 
 	uint16_t baseAddr = 0;
-
 	uint8_t receivedEOF = 0;
 
 	while(1) {
 		line = fgets(buf, BUFFER_SIZE, fp);
 		if(line == NULL) {
 			if(!receivedEOF) {
-				fprintf(stderr, "Got end of file without EOF record. Suspect corrupt data.\n");
+				fprintf(stderr, "Error: got end of file without EOF record. Suspect corrupt data.\n");
 			}
 			break;
 		}
@@ -155,15 +169,11 @@ int main(int argc, char **argv) {
 			continue;
 		}
 
-		if(DEBUG) {
-			puts(line);
-			printf("Len: %d\n", result.len);
-			printf("Addr: %d\n", result.addr);
-			printf("RecType: %d\n", result.recType);
-		}
-
 		hexDump(&result);
 
+		// Take one parsed record and handle it according to the record type.
+		// Modify baseAddr based on the instructions from the EXTADDR and
+		// EXTSEG records. Set receivedEOF if we got the EOF record.
 		switch(result.recType) {
 		case REC_TYPE_EOF:
 			receivedEOF = 1;
@@ -172,15 +182,22 @@ int main(int argc, char **argv) {
  			// Shift over 4 bits because this represents the high bits of the address
 			baseAddr = ((uint16_t)result.output[0]) << 4;
 			if(DEBUG) {
-				printf("new base addr: 0x%X\n", baseAddr);
+				printf("New base addr: 0x%X\n", baseAddr);
 			}
 			break;
 		case REC_TYPE_DATA:
 			// Do the work: write to the flash
 			writeRecord(baseAddr, &result);
 			break;
+		case REC_TYPE_EXTADDR:
+			// Extended linear address record (for 32bit records)
+			baseAddr = ((uint16_t)result.output[0]);
+			if(DEBUG) {
+				printf("New base addr: 0x%X\n", baseAddr);
+			}
+			break;
 		default:
-			fprintf(stderr, "Unknown record type: %0d", result.recType);
+			fprintf(stderr, "Unknown record type: %0d\n", result.recType);
 		}
 	}
 
