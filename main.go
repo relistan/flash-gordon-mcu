@@ -8,6 +8,7 @@ import (
 	"os"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 const (
@@ -20,6 +21,11 @@ var (
 	// twoToThe16th is used in checking address lengths
 	twoToThe16th = int(math.Pow(2, 16))
 )
+
+type Config struct {
+	BaseAddr  *int
+	InputFile *string
+}
 
 // checksumFor calculates the checksum byte for the byteslice we pass in
 func checksumFor(record []byte) byte {
@@ -44,16 +50,37 @@ func formatRecord(addr int, recType byte, rec []byte) string {
 	return fmt.Sprintf(":%02X%02X", allBytes, checkSum)
 }
 
-func main() {
-	filename := os.Args[1]
+// parseConfig parse the command line using Kingpin and returns a Config
+// struct that has been populated.
+func parseConfig() *Config {
+	config := &Config{
+		InputFile: kingpin.Arg("input-file", "The file to take input from").String(),
+		BaseAddr: kingpin.Arg("base-addr", "Base Address to use as starting address").Default("0").Int(),
+	}
+	kingpin.Parse()
+	return config
+}
 
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatalf("Unable to open %s: %s", filename, err)
+func main() {
+	config := parseConfig()
+
+	var (
+		file *os.File
+		err error
+	)
+
+	// If we got a filename use it. Otherwise use stdin.
+	if *config.InputFile == "" {
+		file = os.Stdin
+	} else {
+		file, err = os.Open(*config.InputFile)
+		if err != nil {
+			log.Fatalf("Unable to open %s: %s", *config.InputFile, err)
+		}
 	}
 
 	var (
-		addr       int
+		addr       int = *config.BaseAddr
 		segment    int
 		shouldStop bool
 		buf        []byte = make([]byte, BytesPerLine)
