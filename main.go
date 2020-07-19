@@ -25,7 +25,7 @@ var (
 func checksumFor(record []byte) byte {
 	var sum byte
 	for _, j := range record {
-		sum += byte(j)
+		sum += j
 	}
 
 	return (sum ^ 0xFF) + 1

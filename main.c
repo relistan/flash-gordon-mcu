@@ -18,7 +18,7 @@ Example:
 // This will end up 
 #define BUFFER_SIZE 100
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define REC_TYPE_DATA 0
 #define REC_TYPE_EOF 1     // end-of-file record
@@ -49,19 +49,19 @@ typedef struct {
 
 // checksumFor calculates the checksum for an array of bytes
 uint8_t checksumFor(char *line, uint8_t len) {
-    uint8_t sum
-
-    // Start from 1, to skip ':', run to full len
-	for(uint8_t i = 1; i <= len; i++) {
+    uint8_t sum = 0;
+	for(uint8_t i = 0; i < 8+len; i += 2) {
         // Exit early if we hit the end of string or EOL
 		if(line[i] == '\0' || line[i] == '\n') {
+            fprintf(stderr, "Bailing out early from checksum: '%c'", line[i]);
             break;
 		}
-        sum += line[i];
+        sum += hexToByte(&line[i]);
 	}
 
     return (sum ^ 0xFF) + 1;
 }
+// (("1C126000097D0A0A097075747328225C6E436F6D706C6574652E22293B0A7D0A".split(//).each_slice(2).map { |x| eval("0x#{x.join}") }.inject(0) { |memo, x| memo += x } & 0xFF) ^ 0xFF) + 1
 
 // decodeLine decodes a line of Intel Hex file and populates the resulting data
 // into the `result` struct that is passed in. The `output` field must already
@@ -77,8 +77,6 @@ int decodeLine(char *line, DecodeResult *result) {
 	result->addr = (hexToByte(&line[3]) << 8) | hexToByte(&line[5]);
 	result->recType = hexToByte(&line[7]);
 
-	uint8_t checkTotal = result->len + result->addr + result->recType;
-
 	result->len = result->len << 1; // Double the length because it's hex encoded
 
 	// Loop through all the remaining data and decode the bytes (start from byte 9).
@@ -91,12 +89,12 @@ int decodeLine(char *line, DecodeResult *result) {
 		}
 
 		result->output[outCount] = hexToByte(&line[i]);
-		checkTotal += (uint8_t)result->output[outCount];
 	}
 	result->output[outCount+1] = '\0';
 
 	// Last two characters are the checksum byte
 	uint8_t checkSum = hexToByte(&line[9+result->len]);
+    uint8_t calculated = checksumFor(&line[1], result->len);
 
 	result->len = result->len >> 1; // divide back to actual length
 
@@ -110,8 +108,7 @@ int decodeLine(char *line, DecodeResult *result) {
 
 	// Make sure the checksum is legit or return an error. In that case
 	// it was most likely corrupted in the serial upload.
-	uint16_t calculated = (checkTotal ^ 0xFF) + 1;
-	if((uint8_t)calculated != checkSum) {
+	if(calculated != checkSum) {
 		if(DEBUG) {
 			fprintf(stderr, "Calculated: 0x%0X, Got: 0x%0X\n",
 				(uint8_t)calculated, checkSum
