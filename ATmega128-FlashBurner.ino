@@ -7,7 +7,7 @@
 // ----------------------------------------
 // PB0-7 --> Address 0-7
 // PF0-7 --> Address 8-15
-// PE7   --> Address 16
+// PE5-7 --> Address 16-18
 // PC0-7 --> Data 0-7
 // PD0 --> CE#
 // PD1 --> OE#
@@ -20,7 +20,7 @@
 #define HIGH_ADDR PORTF
 #define HIGHEST_ADDR PORTE
 
-#define HIGHEST_BIT PE7
+#define HIGHEST_BIT PE5
 
 // The port the control pins go on, corresponding to the pins below
 #define CONTROL_PORT PORTD
@@ -36,6 +36,8 @@ void setup() {
   setOutputDisable();
   setChipEnable();
   DDRD |= (1 << CE) | (1 << WE) | (1 << OE);
+
+  turnOnLED();
   
   Serial.begin(57600);
   uint8_t startingConfig = PORTD;
@@ -44,21 +46,28 @@ void setup() {
   
   //chipErase();
 
-  //sectorErase(0);
+//  sectorErase(0);
 
-/*
-  for(int i = 0; i < 50; i++) {
+
+/*  for(int i = 0; i < 50; i++) {
     if (i % 2 == 0) {
-      writeByte(i, 0xaa);
+      writeByte(i, 0xab);
     }
   }
-  */
+*/
   
   delay(10);
   for(int i = 0; i < 60; i++) {
-    byte data = readData(i);
+    readData(i);
   }
   //setChipDisable();
+}
+
+// The AVR board has LEDs on PA0 and PA1, while the Flash Gordon board
+// has an LED on PA0.
+void turnOnLED() {
+  PORTA |= (1 << PA0) | (1 << PA1);
+  DDRA |= (1 << PA0) | (1 << PA1);
 }
 
 void setWriteEnable() {
@@ -107,6 +116,8 @@ void sectorErase(uint16_t sector) {
   sendByte(0x5555, 0xaa);
   sendByte(0x2aaa, 0x55);
   sendByte(0x5555, 0x10);
+  
+  sendByte(sector, 0x30); // 12bit sector on the address lines
   delay(19);
 }
 
@@ -120,8 +131,8 @@ void sendByte(uint32_t address, byte data) {
 }
 
 void writeByte(uint32_t address, byte data) {
-  Serial.printf("a 0x%05x ", address);
-  Serial.printf("W 0x%02x\n", data);
+//  Serial.printf("a 0x%05x ", address);
+//  Serial.printf("W 0x%02x\n", data);
   sendByte(0x5555, 0xaa);
   sendByte(0x2aaa, 0x55);
   sendByte(0x5555, 0xa0);
@@ -140,8 +151,8 @@ byte readData(uint32_t address) {
   setOutputEnable();
   asm("nop; nop; nop; nop;"); // ~37.5 nanoseconds
   byte data = PINC;
-  Serial.printf("a 0x%05x ", address);
-  Serial.printf("r 0x%02x\n", data);
+//  Serial.printf("a 0x%05x ", address);
+//  Serial.printf("r 0x%02x\n", data);
   setOutputDisable();
  
   return data;
@@ -160,11 +171,13 @@ void clearData() {
 }
 
 // setAddress supports a 17bit number for the 010A variant of the flash EEPROM
-byte setAddress(uint32_t address) {
+void setAddress(uint32_t address) {
   // Disable output
   DDRB = 0x00;
   DDRF = 0x00;
   DDRE &= ~(1 << HIGHEST_BIT);
+  DDRE &= ~(1 << PE6);
+  DDRE &= ~(1 << PE7);
   
   // Set ports
   HIGH_ADDR = highByte(address);
@@ -173,16 +186,33 @@ byte setAddress(uint32_t address) {
   // Handle the 17th bit
   if(address > 0xffff) {
     HIGHEST_ADDR |= (1 << HIGHEST_BIT);
+    HIGHEST_ADDR &= ~(1 << PE6);
+    HIGHEST_ADDR &= ~(1 << PE7);
   } else {
     HIGHEST_ADDR &= ~(1 << HIGHEST_BIT);
+    HIGHEST_ADDR &= ~(1 << PE6);
+    HIGHEST_ADDR &= ~(1 << PE7);
   }
 
   // Enable address pins as output
   DDRB = 0xff;
   DDRF = 0xff;
   DDRE |= (1 << HIGHEST_BIT);
+  DDRE |= (1 << PE6);
+  DDRE |= (1 << PE7);
+}
+
+// dumpAll reads bytes from 
+void dumpAll(uint32_t start, uint32_t len) {
+  for(uint32_t i = 0; i < len; i += 32) {
+    Serial.printf("%04X ", i); 
+    for(byte j = 0; j < 32; j++) {
+      Serial.printf("%02X ", readData(i+j));
+    }
+    Serial.println();
+  }
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  processSerialCmd();
 }
