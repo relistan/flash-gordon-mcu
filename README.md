@@ -21,6 +21,14 @@ It is possible to use this with a serial terminal and without the client
 software as long as you can provide properly formatted Intel Hex files using
 the custom (very basic) serial protocol.
 
+The Problem This Solves
+-----------------------
+
+I wanted a cheap flash burner that would be useful for writing to common
+parallel flash chips for experimenting with old 8-bit CPUs. I wanted it to have
+CLI software that runs on macOS easily. I had a couple of ATmega128a boards
+around this chip has enough IO ports to support the 32-pin flash chips easily.
+
 Hardware Required
 -----------------
 
