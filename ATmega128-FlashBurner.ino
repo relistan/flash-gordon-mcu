@@ -30,6 +30,8 @@
 #define OE PD1
 #define WE PD2
 
+#define DEBUG 0
+
 void setup() {
   // Init the chip control pins
   setWriteDisable();
@@ -40,27 +42,12 @@ void setup() {
   turnOnLED();
   
   Serial.begin(57600);
-  uint8_t startingConfig = PORTD;
   Serial.println("--------------------------------");
-  Serial.printf("Starting control pins: 0x%02X\n", startingConfig);
+  delay(10); // Give serial time to settle
   
-  //chipErase();
-
-//  sectorErase(0);
-
-
-/*  for(int i = 0; i < 50; i++) {
-    if (i % 2 == 0) {
-      writeByte(i, 0xab);
-    }
-  }
-*/
-  
-  delay(10);
   for(int i = 0; i < 60; i++) {
     readData(i);
   }
-  //setChipDisable();
 }
 
 // The AVR board has LEDs on PA0 and PA1, while the Flash Gordon board
@@ -151,8 +138,10 @@ byte readData(uint32_t address) {
   setOutputEnable();
   asm("nop; nop; nop; nop;"); // ~37.5 nanoseconds
   byte data = PINC;
-//  Serial.printf("a 0x%05x ", address);
-//  Serial.printf("r 0x%02x\n", data);
+  if(DEBUG) {
+    Serial.printf("a 0x%05x ", address);
+    Serial.printf("r 0x%02x\n", data);
+  }
   setOutputDisable();
  
   return data;

@@ -15,8 +15,6 @@ Example:
 // This will end up 
 #define BUFFER_SIZE 100
 
-#define DEBUG 0
-
 #define REC_TYPE_DATA 0
 #define REC_TYPE_EOF 1     // end-of-file record
 #define REC_TYPE_EXTSEG 2  // extended segment address record
