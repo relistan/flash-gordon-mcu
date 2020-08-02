@@ -43,11 +43,34 @@ void setup() {
   
   Serial.begin(57600);
   Serial.println("--------------------------------");
+<<<<<<< HEAD
+  Serial.printf("Starting control pins: 0x%02X\n", startingConfig);
+  
+  //chipErase();
+
+//  sectorErase(0);
+
+
+/*  for(int i = 0; i < 50; i++) {
+    if (i % 2 == 0) {
+      writeByte(i, 0xab);
+    }
+  }
+*/
+=======
   delay(10); // Give serial time to settle
+>>>>>>> merging
   
   for(int i = 0; i < 60; i++) {
     readData(i);
   }
+}
+
+// The AVR board has LEDs on PA0 and PA1, while the Flash Gordon board
+// has an LED on PA0.
+void turnOnLED() {
+  PORTA |= (1 << PA0) | (1 << PA1);
+  DDRA |= (1 << PA0) | (1 << PA1);
 }
 
 // The AVR board has LEDs on PA0 and PA1, while the Flash Gordon board
@@ -138,10 +161,15 @@ byte readData(uint32_t address) {
   setOutputEnable();
   asm("nop; nop; nop; nop;"); // ~37.5 nanoseconds
   byte data = PINC;
+<<<<<<< HEAD
+//  Serial.printf("a 0x%05x ", address);
+//  Serial.printf("r 0x%02x\n", data);
+=======
   if(DEBUG) {
     Serial.printf("a 0x%05x ", address);
     Serial.printf("r 0x%02x\n", data);
   }
+>>>>>>> merging
   setOutputDisable();
  
   return data;
