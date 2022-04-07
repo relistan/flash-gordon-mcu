@@ -117,16 +117,16 @@ void sendByte(uint32_t address, byte data) {
   clearData();
 }
 
-void writeByte(uint32_t address, byte data) {
+void writeByte(uint32_t address, byte data, char type) {
 //  Serial.printf("a 0x%05x ", address);
 //  Serial.printf("W 0x%02x\n", data);
-  sendByte(0x5555, 0xaa);
-  sendByte(0x2aaa, 0x55);
-  sendByte(0x5555, 0xa0);
 
   sendByte(address, data);
   setChipDisable();
-  delayMicroseconds(20); // Internal flash byte program time
+  switch(type) {
+    case 'f': delayMicroseconds(20); // Internal flash byte program time
+    case 'e': delayMicroseconds(30); // Internal EEPROM byte program time
+  }
   setChipEnable();
 }
 
@@ -191,14 +191,29 @@ void setAddress(uint32_t address) {
   DDRE |= (1 << PE7);
 }
 
-// dumpAll reads bytes from 
+// dumpAll reads a range of bytes from the flash/EEPROM and prints them
+// to the serial port as Intel hex.
 void dumpAll(uint32_t start, uint32_t len) {
-  for(uint32_t i = 0; i < len; i += 32) {
-    Serial.printf("%04X ", i); 
+  byte checksum;
+  
+  // TODO only handles 16bit addressing right now
+  
+  for(uint32_t i = start; i < len; i += 32) {
+
+    // Each byte of 2 bytes in the 16bit addr + hard-coded length
+    checksum = highByte(i) + lowByte(i) + 0x20;
+    
+    // This is :<length><16bit-address><recType>
+    Serial.printf(":%02X%04X00", 32, i); 
+    
     for(byte j = 0; j < 32; j++) {
-      Serial.printf("%02X ", readData(i+j));
+      byte b = readData(i+j);
+      checksum += b;
+      Serial.printf("%02X", b);
     }
-    Serial.println();
+    
+    checksum = (checksum ^ 0xFF) + 1;
+    Serial.printf("%02X\n", checksum);
   }
 }
 

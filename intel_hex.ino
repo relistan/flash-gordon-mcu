@@ -42,6 +42,12 @@ uint8_t hexToByte(char *input) {
   return (partA << 4) | partB;
 }
 
+// hexToUint32 converts 8 bytes of hex text to a uint32_t. Assumes
+// correct buffer length!
+uint32_t hexToUint32(char *buf) {
+  return (hexToByte(buf) << 24) | (hexToByte(&buf[2]) << 16) | (hexToByte(&buf[4]) << 8) | hexToByte(&buf[6]);
+}
+
 // checksumFor calculates the checksum for an array of bytes
 uint8_t checksumFor(char *line, uint8_t len) {
   uint8_t sum = 0;
@@ -146,13 +152,28 @@ void hexDump(DecodeResult *result) {
 
 // writeRecord writes a record to the flash chip with the specified base
 // address.
-void writeRecord(uint16_t baseAddr, struct DecodeResult *result) {
+void writeRecord(uint16_t baseAddr, struct DecodeResult *result, char type) {
   for(uint8_t i = 0; i < result->len; i++) {
-    writeByte(baseAddr+i, result->output[i]);
+    
+    // Flash chips have to be told to write, EEPROMs are good to go
+    if (type == 'f') { // It's a flash chip
+      sendByte(0x5555, 0xaa);
+      sendByte(0x2aaa, 0x55);
+      sendByte(0x5555, 0xa0);
+    } /*else { // Disable write protection on EEPROM if accidentally enabled
+      sendByte(0x1555, 0xaa);
+      sendByte(0x0aaa, 0x55);
+      sendByte(0x1555, 0x80);
+      sendByte(0x1555, 0xaa);
+      sendByte(0x0aaa, 0x55);
+      sendByte(0x1555, 0x20);
+    }*/
+    
+    writeByte(baseAddr+i, result->output[i], type);
   }
 }
 
-void processHexFile() {
+void processHexFile(char type) {
   Serial.println("Processing Hex File.\n");
 
   char buf[BUFFER_SIZE];  
@@ -195,7 +216,7 @@ void processHexFile() {
       break;
     case REC_TYPE_DATA:
       // Do the work: write to the flash
-      writeRecord(baseAddr, &result);
+      writeRecord(baseAddr, &result, type);
       baseAddr += result.len;
       break;
     case REC_TYPE_EXTADDR:

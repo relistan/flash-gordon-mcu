@@ -17,7 +17,7 @@ char *serialReadLine(char *buf) {
     }
 
     if(count >= BUFFER_SIZE) {
-      Serial.println("ERROR: line too long!");
+      Serial.printf("ERROR: line too long! Buffer size '%d', got, '%d'", BUFFER_SIZE, count);
       return buf;
     }
    
@@ -33,11 +33,24 @@ void processSerialCmd() {
   Serial.setTimeout(120000);
   
   char readByte;
+  char buf[8];
+
   Serial.readBytes(&readByte, 1);
   
   switch(readByte) {
   case 'u':
-    processHexFile();
+    Serial.readBytes(&readByte, 1);
+    switch(readByte) {
+      case 'f':
+        processHexFile('f');
+        break;
+      case 'e':
+        processHexFile('e');
+        break;
+      default:
+        Serial.printf("ERROR: unknown chip type '%c'", readByte);
+        break;
+    }
     break;
   case 'e':
     Serial.println("Chip erase...");
@@ -45,8 +58,14 @@ void processSerialCmd() {
     delay(2000);
     break;
   case 'd':
-    Serial.println("Dumping data...");
-    dumpAll(0, 5918);
+    uint32_t baseAddr, len;
+    
+    Serial.readBytes(buf, 8);
+    baseAddr = hexToUint32(buf);
+    Serial.readBytes(buf, 8);
+    len = hexToUint32(buf);
+    
+    dumpAll(baseAddr, len);
     break;
   }
 }
