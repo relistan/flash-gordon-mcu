@@ -45,7 +45,19 @@ uint8_t hexToByte(char *input) {
 // hexToUint32 converts 8 bytes of hex text to a uint32_t. Assumes
 // correct buffer length!
 uint32_t hexToUint32(char *buf) {
-  return (hexToByte(buf) << 24) | (hexToByte(&buf[2]) << 16) | (hexToByte(&buf[4]) << 8) | hexToByte(&buf[6]);
+  uint32_t tmp, retval;
+  // Seem to have to do it this way to force the compiler to put those 
+  // bytes into a 32bit space
+  tmp = hexToByte(buf);
+  retval = (tmp << 24);
+  
+  tmp = hexToByte(&buf[2]);
+  retval |= (tmp  << 16);
+  
+  tmp = hexToByte(&buf[4]);
+  retval |= (tmp << 8);
+
+  return retval | hexToByte(&buf[6]);
 }
 
 // checksumFor calculates the checksum for an array of bytes

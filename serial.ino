@@ -29,11 +29,12 @@ char *serialReadLine(char *buf) {
 }
 
 void processSerialCmd() {
-  Serial.printf("\nEnter Command: ");
+  Serial.printf("\n>");
   Serial.setTimeout(120000);
   
   char readByte;
   char buf[8];
+  uint32_t baseAddr, len = 0;
 
   Serial.readBytes(&readByte, 1);
   
@@ -58,13 +59,10 @@ void processSerialCmd() {
     delay(2000);
     break;
   case 'd':
-    uint32_t baseAddr, len;
-    
     Serial.readBytes(buf, 8);
     baseAddr = hexToUint32(buf);
     Serial.readBytes(buf, 8);
-    len = hexToUint32(buf);
-    
+    len = hexToUint32(buf);    
     dumpAll(baseAddr, len);
     break;
   }

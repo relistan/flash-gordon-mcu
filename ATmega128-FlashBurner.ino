@@ -20,8 +20,6 @@
 #define HIGH_ADDR PORTF
 #define HIGHEST_ADDR PORTE
 
-#define HIGHEST_BIT PE5
-
 // The port the control pins go on, corresponding to the pins below
 #define CONTROL_PORT PORTD
 
@@ -118,15 +116,21 @@ void sendByte(uint32_t address, byte data) {
 }
 
 void writeByte(uint32_t address, byte data, char type) {
-//  Serial.printf("a 0x%05x ", address);
-//  Serial.printf("W 0x%02x\n", data);
+  // Flash writes require being in the right mode
+  if (type == 'f') {
+    sendByte(0x5555, 0xa0);
+    sendByte(0x2aaa, 0x55);
+    sendByte(0x5555, 0xa0);
+  }
 
   sendByte(address, data);
   setChipDisable();
+  
   switch(type) {
-    case 'f': delayMicroseconds(20); // Internal flash byte program time
-    case 'e': delayMicroseconds(30); // Internal EEPROM byte program time
+    case 'f': delayMicroseconds(20); break; // Internal flash byte program time
+    case 'e': delayMicroseconds(30); break; // Internal EEPROM byte program time
   }
+  
   setChipEnable();
 }
 
@@ -164,31 +168,31 @@ void setAddress(uint32_t address) {
   // Disable output
   DDRB = 0x00;
   DDRF = 0x00;
-  DDRE &= ~(1 << HIGHEST_BIT);
+  DDRE &= ~(1 << PE5);
   DDRE &= ~(1 << PE6);
   DDRE &= ~(1 << PE7);
   
   // Set ports
-  HIGH_ADDR = highByte(address);
   LOW_ADDR  = lowByte(address);
+  HIGH_ADDR = highByte(address);
 
-  // Handle the 17th bit
+  // Handle the highest bits
   if(address > 0xffff) {
-    HIGHEST_ADDR |= (1 << HIGHEST_BIT);
-    HIGHEST_ADDR &= ~(1 << PE6);
-    HIGHEST_ADDR &= ~(1 << PE7);
+    // Enable A16-18 (PE5-PE7) by moving into lowest byte, then left shift 5
+    // to get back to correct placement. Drop the remainder of the 32bits.
+    HIGHEST_ADDR |= (((address >> 16) << 5) & 0xFFFF); 
   } else {
-    HIGHEST_ADDR &= ~(1 << HIGHEST_BIT);
-    HIGHEST_ADDR &= ~(1 << PE6);
-    HIGHEST_ADDR &= ~(1 << PE7);
+    // Disable A16-18 (PE5-PE7)
+    HIGHEST_ADDR &= 0b00011111;
   }
+
+  if 
 
   // Enable address pins as output
   DDRB = 0xff;
   DDRF = 0xff;
-  DDRE |= (1 << HIGHEST_BIT);
-  DDRE |= (1 << PE6);
-  DDRE |= (1 << PE7);
+  DDRE |= (1 << PE5) | (1 << PE6) | (1 << PE7);
+  // Serial tx/rx are on PORTE 0-1
 }
 
 // dumpAll reads a range of bytes from the flash/EEPROM and prints them
@@ -198,15 +202,20 @@ void dumpAll(uint32_t start, uint32_t len) {
   
   // TODO only handles 16bit addressing right now
   
-  for(uint32_t i = start; i < len; i += 32) {
+  for(uint32_t i = start; i <= len; i += 32) {
 
-    // Each byte of 2 bytes in the 16bit addr + hard-coded length
-    checksum = highByte(i) + lowByte(i) + 0x20;
+    byte lineLen = 32;
+    if ((i + 32) >= (start + len)) {
+      lineLen = start + len - i;
+    }
+
+    // Each byte of 2 bytes in the 16bit addr + line length
+    checksum = highByte(i) + lowByte(i) + lineLen;
     
     // This is :<length><16bit-address><recType>
-    Serial.printf(":%02X%04X00", 32, i); 
+    Serial.printf(":%02X%04X00", lineLen, i); 
     
-    for(byte j = 0; j < 32; j++) {
+    for(byte j = 0; j < lineLen; j++) {
       byte b = readData(i+j);
       checksum += b;
       Serial.printf("%02X", b);
@@ -215,6 +224,7 @@ void dumpAll(uint32_t start, uint32_t len) {
     checksum = (checksum ^ 0xFF) + 1;
     Serial.printf("%02X\n", checksum);
   }
+  Serial.printf(":00000001FF\n");
 }
 
 void loop() {
