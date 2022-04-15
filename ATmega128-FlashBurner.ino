@@ -42,10 +42,6 @@ void setup() {
   Serial.begin(57600);
   Serial.println("--------------------------------");
   delay(10); // Give serial time to settle
-  
-  for(int i = 0; i < 60; i++) {
-    readData(i);
-  }
 }
 
 // The AVR board has LEDs on PA0 and PA1, while the Flash Gordon board
@@ -186,8 +182,6 @@ void setAddress(uint32_t address) {
     HIGHEST_ADDR &= 0b00011111;
   }
 
-  if 
-
   // Enable address pins as output
   DDRB = 0xff;
   DDRF = 0xff;
@@ -202,7 +196,7 @@ void dumpAll(uint32_t start, uint32_t len) {
   
   // TODO only handles 16bit addressing right now
   
-  for(uint32_t i = start; i <= len; i += 32) {
+  for(uint32_t i = start; i < len; i += 32) {
 
     byte lineLen = 32;
     if ((i + 32) >= (start + len)) {
